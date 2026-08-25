@@ -1,0 +1,48 @@
+{
+  "name": "@frxnklyn/google-sheets",
+  "version": "0.1.0",
+  "description": "Type-safe Google Sheets implementation of @frxnklyn/datatypes.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "INTERFACE_NOTES.md"
+  ],
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "test:integration": "npm run build && node tests/read-sheets.integration.mjs",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "google-sheets",
+    "typescript",
+    "spreadsheet",
+    "datatypes"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "google-auth-library": "10.5.0",
+    "googleapis": "^176.0.0"
+  },
+  "peerDependencies": {
+    "@frxnklyn/datatypes": "^0.1.0"
+  },
+  "devDependencies": {
+    "@frxnklyn/datatypes": "file:../npm-datatypes",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
