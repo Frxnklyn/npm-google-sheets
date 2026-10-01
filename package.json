@@ -19,10 +19,22 @@
   ],
   "scripts": {
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
-    "build": "npm run clean && npm run build --prefix node_modules/@frxnklyn/datatypes && tsc -p tsconfig.json",
+    "build": "npm run clean && tsc -p tsconfig.json",
     "test": "npm run build && node --test tests/*.test.mjs",
     "test:integration": "npm run build && node tests/read-sheets.integration.mjs",
-    "prepare": "npm run build"
+    "prepack": "npm run build"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Frxnklyn/npm-google-sheets.git"
+  },
+  "homepage": "https://github.com/Frxnklyn/npm-google-sheets#readme",
+  "bugs": {
+    "url": "https://github.com/Frxnklyn/npm-google-sheets/issues"
   },
   "keywords": [
     "google-sheets",
