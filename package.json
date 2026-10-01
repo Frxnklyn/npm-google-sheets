@@ -51,7 +51,7 @@
     "@frxnklyn/datatypes": "^0.1.0"
   },
   "devDependencies": {
-    "@frxnklyn/datatypes": "github:Frxnklyn/npm-datatypes#main",
+    "@frxnklyn/datatypes": "git+https://github.com/Frxnklyn/npm-datatypes.git#e2766f84c7fd9ce3c3a99ad3b21c532b458ab45c",
     "typescript": "^5.9.3"
   },
   "engines": {
