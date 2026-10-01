@@ -22,6 +22,7 @@
     "build": "npm run clean && tsc -p tsconfig.json",
     "test": "npm run build && node --test tests/*.test.mjs",
     "test:integration": "npm run build && node tests/read-sheets.integration.mjs",
+    "prepare": "npm run build",
     "prepack": "npm run build"
   },
   "publishConfig": {
@@ -51,7 +52,7 @@
     "@frxnklyn/datatypes": "^0.1.0"
   },
   "devDependencies": {
-    "@frxnklyn/datatypes": "git+https://github.com/Frxnklyn/npm-datatypes.git#e2766f84c7fd9ce3c3a99ad3b21c532b458ab45c",
+    "@frxnklyn/datatypes": "git+https://github.com/Frxnklyn/npm-datatypes.git#cd41ff6d1257d4c48a4881fda867e57ad52e30f6",
     "typescript": "^5.9.3"
   },
   "engines": {
