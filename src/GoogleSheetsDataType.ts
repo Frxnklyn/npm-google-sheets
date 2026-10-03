@@ -234,7 +234,6 @@ export class GoogleSheetsDataType implements ExcelDataTypeInterface, TableSource
       ?? new GoogleSheet(this, name);
     sheet.updateIdentity(name, index, sheetId);
     this.referencesByName.set(name, sheet);
-    this.referencesByIndex.set(index, sheetId === undefined ? sheet : sheet);
     this.referencesByIndex.set(index, sheet);
     if (!this.sheets.includes(sheet)) this.sheets.push(sheet);
     return sheet;
