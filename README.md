@@ -4,8 +4,8 @@ Eine TypeScript-Implementierung der Excel- und Table-Interfaces aus
 `@frxnklyn/datatypes` für die Google Sheets API v4.
 
 Das Paket bietet lazy Workbook-, Sheet- und Cell-Referenzen, Lesen und Speichern
-von Werten und Formeln, eine Table-Sicht mit lokalen Filtern sowie das Anlegen
-und Entfernen von Sheets.
+von Werten und Formeln, eine Table-Sicht mit portablen SQL-ähnlichen Queries
+sowie das Anlegen und Entfernen von Sheets.
 
 ## Voraussetzungen
 
@@ -179,6 +179,94 @@ await table.dataSave();
 Filter werden nach dem Google-Sheets-Read lokal ausgewertet. Ein anschließendes
 `dataSave()` speichert genau die aktuell sichtbaren Table-Rows. Eine gefilterte
 Table sollte daher nur gespeichert werden, wenn dieses Ersetzen beabsichtigt ist.
+
+### Portable Queries wie bei SQL
+
+`GoogleSheetsDataType` implementiert zusätzlich `TableSourceInterface`. Damit
+kann dieselbe `TableQueryInterface` verwendet werden, die später auch eine
+SQL-Source oder eine andere tabellarische Datenquelle implementieren kann.
+
+```ts
+const table = workbook.getTable("Produkte", {
+  where: {
+    comparator: "and",
+    conditions: [
+      {
+        attribute: "Preis",
+        operator: "greaterThan",
+        value: 20,
+      },
+      {
+        comparator: "or",
+        conditions: [
+          {
+            attribute: "Name",
+            operator: "contains",
+            value: "Tastatur",
+          },
+          {
+            attribute: "Name",
+            operator: "contains",
+            value: "Monitor",
+          },
+        ],
+      },
+    ],
+  },
+  orderBy: [
+    {
+      attribute: "Preis",
+      direction: "desc",
+    },
+  ],
+  offset: 0,
+  limit: 10,
+  select: ["Name", "Preis"],
+});
+
+// getTable() bleibt lazy.
+await table.dataRead();
+```
+
+Unterstützt werden:
+
+- rekursive `where`-Gruppen mit `and` / `or`
+- die gemeinsamen Filteroperatoren aus `@frxnklyn/datatypes`
+- `select`
+- `orderBy`
+- `offset` / `limit`
+- `groupBy`
+- `sum`, `avg`, `count`, `min` und `max`
+
+Die Query beschreibt nur das gewünschte Ergebnis. Google Sheets lädt die
+Sheet-Werte und führt die Query lokal aus. Eine spätere SQL-Implementierung kann
+dieselbe Query stattdessen in parameterisiertes SQL übersetzen.
+
+```text
+Consumer
+   -> TableSourceInterface
+      -> getTable(name, query)
+         -> lazy Table
+            -> dataRead()
+
+Google Sheets: Values API -> Query lokal
+SQL:           SELECT ... WHERE ... ORDER BY ...
+```
+
+Query-Views sind absichtlich read-only. Für Schreibzugriffe wird eine normale
+Table ohne Query verwendet:
+
+```ts
+const writable = workbook.getTable("Produkte");
+await writable.dataRead();
+writable.addRow(["Monitor", 199]);
+await writable.dataSave();
+```
+
+Als `TableSourceInterface` bietet das Workbook außerdem `hasTable()`,
+`addTable(schema)` und `removeTable(name)`. Bei Google Sheets entspricht eine
+Table einem Sheet und die Attribute eines neuen Schemas werden als Header-Zeile
+angelegt.
 
 ## Sheets verwalten
 
