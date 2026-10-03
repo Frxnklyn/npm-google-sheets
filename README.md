@@ -131,6 +131,53 @@ Die Connection ergänzt dabei nur die bekannte `spreadsheetId` und sendet die
 Anfrage. Ob Grid-Daten, Metadaten, ein bestimmter Range oder ein bestimmter
 Schreibmodus gebraucht wird, entscheidet die jeweils aufrufende Fachklasse.
 
+## Gemeinsamer Read-Cache
+
+Google-Reads werden standardmäßig **60 Sekunden** pro Node-Prozess gecacht.
+Der Cache gehört nicht zu einer einzelnen `GoogleSheetsTable`: Alle
+`GoogleSheetConnection`-, Workbook- und Table-Instanzen mit derselben
+Spreadsheet-ID und demselben Service Account teilen ihn.
+
+Dadurch laden auch unterschiedliche portable Queries dasselbe Sheet innerhalb
+des Cache-Fensters nur einmal von Google. `where`, `orderBy`, `limit` usw.
+werden anschließend lokal auf denselben Rohdaten ausgeführt.
+
+Es läuft kein Hintergrund-Timer. Bei jedem Read wird die Zeit geprüft:
+
+```text
+erster Read
+  -> Google API
+  -> Cache
+
+weitere Reads < 60 s
+  -> Cache
+
+erster Read nach >= 60 s
+  -> Google API
+  -> Cache erneuern
+```
+
+Parallele identische Reads werden als **Single Flight** zusammengefasst und
+teilen denselben laufenden Google-Request. Damit erzeugt auch ein gleichzeitiger
+Burst nicht für jede Anfrage einen eigenen API-Read.
+
+Schreibzugriffe invalidieren den Cache automatisch vor und nach dem Write.
+Manuell kann der Cache jederzeit geleert werden:
+
+```ts
+workbook.clearCache();
+// oder direkt:
+connection.clearCache();
+```
+
+Beim Erzeugen der Connection kann die TTL optional angepasst werden:
+
+```ts
+const connection = new GoogleSheetConnection(url, credentials, {
+  cacheTtlMs: 30_000,
+});
+```
+
 ## Cells lesen und schreiben
 
 ```ts
