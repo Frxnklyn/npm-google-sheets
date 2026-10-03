@@ -1,6 +1,7 @@
 import type {
   ExcelSheetDataTypeInterface,
   TableCellValue,
+  TableQueryInterface,
 } from "@frxnklyn/datatypes";
 import type { sheets_v4 } from "googleapis";
 import { GoogleSheetsCell } from "./GoogleSheetsCell.js";
@@ -76,7 +77,9 @@ export class GoogleSheet implements ExcelSheetDataTypeInterface {
     return this;
   }
 
-  public asTable(): GoogleSheetsTable { return this.table; }
+  public asTable(query?: TableQueryInterface): GoogleSheetsTable {
+    return query === undefined ? this.table : new GoogleSheetsTable(this, query);
+  }
 
   public replaceTable(headers: readonly string[], rows: readonly (readonly TableCellValue[])[]): void {
     const previous = this.getCells();
