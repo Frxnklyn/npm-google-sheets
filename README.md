@@ -170,13 +170,29 @@ workbook.clearCache();
 connection.clearCache();
 ```
 
-Beim Erzeugen der Connection kann die TTL optional angepasst werden:
+Beim Erzeugen der Connection kann die Cache-Policy angepasst werden:
 
 ```ts
-const connection = new GoogleSheetConnection(url, credentials, {
+// Standard: 60 Sekunden
+const normal = new GoogleSheetConnection(url, credentials);
+
+// Eigene TTL
+const short = new GoogleSheetConnection(url, credentials, {
   cacheTtlMs: 30_000,
 });
+
+// Kein automatischer Ablauf.
+// Der Cache bleibt bestehen, bis clearCache() aufgerufen wird
+// oder ein Write ihn automatisch invalidiert.
+const manualOnly = new GoogleSheetConnection(url, credentials, {
+  cacheTtlMs: null,
+});
 ```
+
+`getCacheTtlMs()` liefert die effektive Einstellung zurück. `null` bedeutet
+dabei **manuelle Invalidierung ohne TTL**. Unterschiedliche Cache-Policies
+verwenden getrennte Cache-Einträge; `clearCache()` entfernt sie gemeinsam für
+das Spreadsheet und den verwendeten Service Account.
 
 ## Cells lesen und schreiben
 
