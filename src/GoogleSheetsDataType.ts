@@ -1,6 +1,9 @@
 import type {
   ExcelDataTypeInterface,
   ExcelSheetDataTypeInterface,
+  TableQueryInterface,
+  TableSchemaInterface,
+  TableSourceInterface,
 } from "@frxnklyn/datatypes";
 import type { sheets_v4 } from "googleapis";
 import { GoogleSheet } from "./GoogleSheet.js";
@@ -9,8 +12,13 @@ import type { GoogleSheetConnection } from "./GoogleSheetConnection.js";
 /**
  * Fachliche Repräsentation eines vollständigen Google Spreadsheets.
  * Authentifizierung und Requests werden vollständig an die Connection delegiert.
+ *
+ * Gleichzeitig implementiert das Workbook den allgemeinen TableSource-Vertrag:
+ * Ein Sheet entspricht dabei einer fachlichen Table. Dadurch kann ein Consumer
+ * dieselben TableQueryInterface-Objekte später gegen Google Sheets, SQL oder
+ * eine andere TableSource ausführen.
  */
-export class GoogleSheetsDataType implements ExcelDataTypeInterface {
+export class GoogleSheetsDataType implements ExcelDataTypeInterface, TableSourceInterface {
   private name: string | undefined;
   private sheets: GoogleSheet[] = [];
   private readonly referencesByName = new Map<string, GoogleSheet>();
@@ -45,8 +53,57 @@ export class GoogleSheetsDataType implements ExcelDataTypeInterface {
     return sheet;
   }
 
-  public getTable(sheetName: string): ReturnType<GoogleSheet["asTable"]> {
-    return this.getSheet(sheetName).asTable();
+  /**
+   * Liefert eine lazy Table-Referenz. Eine optionale portable Query wird erst
+   * beim späteren dataRead() ausgewertet.
+   */
+  public getTable(
+    sheetName: string,
+    query?: TableQueryInterface,
+  ): ReturnType<GoogleSheet["asTable"]> {
+    return this.getSheet(sheetName).asTable(query);
+  }
+
+  /** Prüft über einen reinen Metadata-Read, ob das Sheet existiert. */
+  public async hasTable(name: string): Promise<boolean> {
+    const metadata = await this.fetchMetadata();
+    return metadata.sheets?.some((sheet) => sheet.properties?.title === name) ?? false;
+  }
+
+  /**
+   * Legt ein neues Sheet aus einem allgemeinen TableSchema an. Die Attribute
+   * werden in Tabellenreihenfolge als Header-Zeile geschrieben.
+   */
+  public async addTable(schema: TableSchemaInterface): Promise<ReturnType<GoogleSheet["asTable"]>> {
+    const name = schema.getName();
+    if (await this.hasTable(name)) {
+      throw new Error(`Table '${name}' already exists.`);
+    }
+
+    const sheet = this.getSheet(name);
+    await this.ensureSheetExists(sheet);
+    schema.getAttributes().forEach((attribute, index) => {
+      sheet.setCell(0, index, attribute.getName());
+    });
+    await sheet.dataSave();
+    return sheet.asTable();
+  }
+
+  /** Entfernt ein Sheet unmittelbar aus der externen TableSource. */
+  public async removeTable(name: string): Promise<void> {
+    const metadata = await this.fetchMetadata();
+    const remote = metadata.sheets?.find((sheet) => sheet.properties?.title === name);
+    const sheetId = remote?.properties?.sheetId;
+
+    if (sheetId === null || sheetId === undefined) return;
+
+    await this.connection.update({ requests: [{ deleteSheet: { sheetId } }] });
+    this.sheets = this.sheets.filter((sheet) => sheet.getName() !== name);
+    this.referencesByName.delete(name);
+
+    const index = remote?.properties?.index;
+    if (index !== null && index !== undefined) this.referencesByIndex.delete(index);
+    this.removedNames.delete(name);
   }
 
   public addSheet(sheet: string | ExcelSheetDataTypeInterface): this {

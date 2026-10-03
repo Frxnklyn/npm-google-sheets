@@ -1,15 +1,32 @@
 # Notizen zu `@frxnklyn/datatypes`
 
-Stand: 23. August 2026
+Stand: 3. Oktober 2026
 
-Für die aktuelle Implementierung waren **keine Änderungen oder Ergänzungen** an
-den Interfaces in `npm-datatypes` erforderlich. Das Projekt `npm-datatypes`
-wurde nicht bearbeitet.
+`npm-google-sheets` verwendet jetzt zusätzlich die portablen Table-Contracts aus
+`@frxnklyn/datatypes`:
 
-Implementierungsspezifische Angaben wie URL, `spreadsheetId`, Credentials und
-Google-Requests bleiben in `GoogleSheetConnection`; die interne numerische
-`sheetId` bleibt in `GoogleSheet`. Sie gehören nicht in die allgemeinen
-Excel-/Table-Verträge.
+- `TableQueryInterface` für datenquellenunabhängige Queries
+- `TableSourceInterface` als austauschbare Source-Abstraktion
+- `TableSchemaInterface` für das Anlegen neuer Tables/Sheets
 
-Mögliche spätere Erweiterungen müssen zuerst hier dokumentiert werden, bevor
-eine Änderung an den gemeinsamen Interfaces vorgeschlagen wird.
+Dabei bleibt die Google-spezifische Technik außerhalb der gemeinsamen Contracts.
+URL, `spreadsheetId`, Credentials und Google-Requests liegen weiterhin in
+`GoogleSheetConnection`; die interne numerische `sheetId` bleibt in
+`GoogleSheet`.
+
+Ein Google Sheet wird auf Table-Ebene als fachliche Table behandelt. Der Ablauf
+entspricht damit dem allgemeinen Contract:
+
+```text
+TableSourceInterface
+  -> getTable(name, query)
+     -> lazy TableDataTypeInterface
+        -> dataRead()
+```
+
+Die portable Query wird von Google Sheets lokal auf den über die Values API
+gelesenen Rows ausgeführt. Eine spätere SQL-Implementierung kann denselben
+`TableQueryInterface`-Vertrag in parameterisiertes SQL übersetzen, ohne dass
+Consumer ihre Query-Struktur ändern müssen.
+
+Die bestehenden Excel-, Sheet-, Cell- und Legacy-Filter-APIs bleiben erhalten.
