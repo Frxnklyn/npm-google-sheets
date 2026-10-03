@@ -165,6 +165,92 @@ test("filters locally and delegates value writes to the connection", async () =>
   assert.deepEqual(updates[0].requestBody.values[2], ["Monitor", 199, null]);
 });
 
+test("executes portable SQL-like queries lazily", async () => {
+  const { connection, valueReads } = createConnection();
+  const workbook = new GoogleSheetsDataType(connection);
+
+  const plain = workbook.getTable("Produkte");
+  const queried = workbook.getTable("Produkte", {
+    where: {
+      comparator: "and",
+      conditions: [
+        { attribute: "Preis", operator: "greaterThan", value: 10 },
+        {
+          comparator: "or",
+          conditions: [
+            { attribute: "Name", operator: "contains", value: "ast" },
+            { attribute: "Name", operator: "contains", value: "Mau" },
+          ],
+        },
+      ],
+    },
+    orderBy: [{ attribute: "Preis", direction: "desc" }],
+    offset: 1,
+    limit: 1,
+    select: ["Name", "Preis"],
+  });
+
+  assert.equal(valueReads.length, 0);
+  assert.notStrictEqual(queried, plain);
+  assert.strictEqual(workbook.getTable("Produkte"), plain);
+
+  await queried.dataRead();
+
+  assert.equal(valueReads.length, 1);
+  assert.deepEqual(queried.getHeaders(), ["Name", "Preis"]);
+  assert.equal(queried.getRows().length, 1);
+  assert.equal(queried.getRow(0).getValue("Name"), "Maus");
+  assert.equal(queried.getRow(0).getValue("Preis"), 19.9);
+  await assert.rejects(() => queried.dataSave(), /read-only/);
+});
+
+test("supports grouping and aggregations through the portable query contract", async () => {
+  const { connection } = createConnection();
+  const workbook = new GoogleSheetsDataType(connection);
+
+  const aggregate = workbook.getTable("Produkte", {
+    aggregations: [
+      { function: "count", as: "Anzahl" },
+      { function: "sum", attribute: "Preis", as: "Summe" },
+      { function: "avg", attribute: "Preis", as: "Durchschnitt" },
+      { function: "min", attribute: "Preis", as: "Minimum" },
+      { function: "max", attribute: "Preis", as: "Maximum" },
+    ],
+  });
+
+  await aggregate.dataRead();
+
+  assert.deepEqual(
+    aggregate.getHeaders(),
+    ["Anzahl", "Summe", "Durchschnitt", "Minimum", "Maximum"],
+  );
+  assert.deepEqual(aggregate.getRow(0).getValues(), [2, 69.8, 34.9, 19.9, 49.9]);
+
+  const grouped = workbook.getTable("Produkte", {
+    groupBy: ["Name"],
+    aggregations: [{ function: "count", as: "Anzahl" }],
+    orderBy: [{ attribute: "Name", direction: "asc" }],
+  });
+
+  await grouped.dataRead();
+
+  assert.deepEqual(grouped.getHeaders(), ["Name", "Anzahl"]);
+  assert.deepEqual(grouped.getRows().map((row) => row.getValues()), [
+    ["Maus", 1],
+    ["Tastatur", 1],
+  ]);
+});
+
+test("implements TableSource existence checks with metadata-only reads", async () => {
+  const { connection, reads } = createConnection();
+  const workbook = new GoogleSheetsDataType(connection);
+
+  assert.equal(await workbook.hasTable("Produkte"), true);
+  assert.equal(await workbook.hasTable("Fehlt"), false);
+  assert.equal(reads.length, 2);
+  assert.equal(reads.every((request) => request.includeGridData === false), true);
+});
+
 test("validates lazy addresses and formulas without a request", () => {
   const { connection, reads } = createConnection();
   const workbook = new GoogleSheetsDataType(connection);
