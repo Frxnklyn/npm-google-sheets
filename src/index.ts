@@ -1,5 +1,6 @@
 export { GoogleSheetConnection } from "./GoogleSheetConnection.js";
 export type {
+  GoogleSheetConnectionOptions,
   SpreadsheetReadRequest,
   SpreadsheetUpdateRequest,
   SpreadsheetValueClearRequest,
