@@ -42,7 +42,7 @@ function fixtureSheet() {
   };
 }
 
-function createConnection() {
+function createConnection({ clearCache = true, cacheTtlMs } = {}) {
   const reads = [];
   const valueReads = [];
   const updates = [];
@@ -88,7 +88,12 @@ function createConnection() {
     },
   };
 
-  const connection = new GoogleSheetConnection(SHEET_URL, TEST_CREDENTIALS);
+  const connection = new GoogleSheetConnection(
+    SHEET_URL,
+    TEST_CREDENTIALS,
+    cacheTtlMs === undefined ? undefined : { cacheTtlMs },
+  );
+  if (clearCache) connection.clearCache();
   connection.api = client;
   return { connection, reads, valueReads, updates, clears, batchUpdates };
 }
@@ -148,7 +153,7 @@ test("lets workbook and table choose their own read options", async () => {
 });
 
 test("filters locally and delegates value writes to the connection", async () => {
-  const { connection, updates, clears } = createConnection();
+  const { connection, valueReads, updates, clears } = createConnection();
   const workbook = new GoogleSheetsDataType(connection);
   const table = workbook.getTable("Produkte");
 
@@ -163,6 +168,46 @@ test("filters locally and delegates value writes to the connection", async () =>
   assert.equal(updates[0].spreadsheetId, SHEET_ID);
   assert.equal(updates[0].range, "'Produkte'");
   assert.deepEqual(updates[0].requestBody.values[2], ["Monitor", 199, null]);
+
+  await table.dataRead();
+  assert.equal(valueReads.length, 2, "a write invalidates the cached table read");
+});
+
+test("shares reads across table, workbook and connection instances", async () => {
+  const first = createConnection();
+  const second = createConnection({ clearCache: false });
+
+  const firstTable = new GoogleSheetsDataType(first.connection).getTable("Produkte", {
+    where: { attribute: "Preis", operator: "greaterThan", value: 20 },
+  });
+  const secondTable = new GoogleSheetsDataType(second.connection).getTable("Produkte", {
+    where: { attribute: "Name", operator: "contains", value: "Maus" },
+  });
+
+  await Promise.all([firstTable.dataRead(), secondTable.dataRead()]);
+
+  assert.equal(first.valueReads.length + second.valueReads.length, 1);
+  assert.equal(firstTable.getRows().length, 1);
+  assert.equal(secondTable.getRows().length, 1);
+
+  second.connection.clearCache();
+  await secondTable.dataRead();
+  assert.equal(second.valueReads.length, 1, "manual clearCache forces the next Google read");
+});
+
+test("refreshes a cached read on the first request after the TTL", async () => {
+  const first = createConnection({ cacheTtlMs: 5 });
+  const firstTable = new GoogleSheetsDataType(first.connection).getTable("Produkte");
+  await firstTable.dataRead();
+  assert.equal(first.valueReads.length, 1);
+
+  await new Promise((resolve) => setTimeout(resolve, 15));
+
+  const second = createConnection({ clearCache: false, cacheTtlMs: 5 });
+  const secondTable = new GoogleSheetsDataType(second.connection).getTable("Produkte");
+  await secondTable.dataRead();
+
+  assert.equal(second.valueReads.length, 1);
 });
 
 test("executes portable SQL-like queries lazily", async () => {
@@ -247,7 +292,7 @@ test("implements TableSource existence checks with metadata-only reads", async (
 
   assert.equal(await workbook.hasTable("Produkte"), true);
   assert.equal(await workbook.hasTable("Fehlt"), false);
-  assert.equal(reads.length, 2);
+  assert.equal(reads.length, 1, "identical metadata reads share the cache");
   assert.equal(reads.every((request) => request.includeGridData === false), true);
 });
 

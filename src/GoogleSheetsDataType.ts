@@ -34,6 +34,13 @@ export class GoogleSheetsDataType implements ExcelDataTypeInterface, TableSource
   /** Gibt die gemeinsame technische Connection für die enthaltenen Sheets zurück. */
   public getConnection(): GoogleSheetConnection { return this.connection; }
 
+  /**
+   * Verwirft den gemeinsamen Read-Cache dieses Spreadsheets. Auch andere
+   * Workbook-/Table-Instanzen im selben Prozess lesen danach beim nächsten
+   * Zugriff wieder frisch von Google.
+   */
+  public clearCache(): void { this.connection.clearCache(); }
+
   public getSheet(name: string): GoogleSheet;
   public getSheet(index: number): GoogleSheet;
   /** Erstellt oder liefert eine lazy Referenz, ohne Google anzufragen. */
