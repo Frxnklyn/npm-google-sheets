@@ -112,6 +112,33 @@ test("validates a Google Sheets URL and extracts its spreadsheet id", () => {
   );
 });
 
+test("supports finite and manual-only cache policies", async () => {
+  const defaults = new GoogleSheetConnection(SHEET_URL, TEST_CREDENTIALS);
+  assert.equal(defaults.getCacheTtlMs(), 60_000);
+
+  const manual = createConnection({ cacheTtlMs: null });
+  assert.equal(manual.connection.getCacheTtlMs(), null);
+
+  const firstTable = new GoogleSheetsDataType(manual.connection).getTable("Produkte");
+  await firstTable.dataRead();
+  await new Promise((resolve) => setTimeout(resolve, 15));
+
+  const second = createConnection({ clearCache: false, cacheTtlMs: null });
+  const secondTable = new GoogleSheetsDataType(second.connection).getTable("Produkte");
+  await secondTable.dataRead();
+
+  assert.equal(
+    manual.valueReads.length + second.valueReads.length,
+    1,
+    "manual cache mode does not expire automatically",
+  );
+
+  assert.throws(
+    () => new GoogleSheetConnection(SHEET_URL, TEST_CREDENTIALS, { cacheTtlMs: -1 }),
+    /cacheTtlMs/,
+  );
+});
+
 test("keeps getSheet lazy and delegates the first read to the connection", async () => {
   const { connection, reads } = createConnection();
   const workbook = new GoogleSheetsDataType(connection);
